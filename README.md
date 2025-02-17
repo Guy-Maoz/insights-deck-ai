@@ -1,66 +1,67 @@
-# AI Dashboard Generator
+# Dashboard Generator AI Agent
 
-An AI-powered dashboard generator that creates interactive HTML dashboards from datasets based on natural language instructions. Built with Plotly, Pydantic, and OpenAI's GPT models.
+An AI-powered dashboard generator that creates interactive HTML dashboards from datasets based on natural language instructions.
 
 ## Features
 
-- **Natural Language Instructions**: Create dashboards by describing what you want to visualize
-- **Automatic Data Analysis**: Intelligent selection of appropriate visualizations based on data types
-- **Interactive Visualizations**: Built with Plotly for rich, interactive charts
-- **Responsive Layout**: Grid and vertical layouts with automatic responsiveness
-- **Theme Support**: Light and dark theme options
-- **Multiple Chart Types**:
-  - Line charts
-  - Bar charts
-  - Scatter plots
-  - Pie charts
-  - Histograms
-  - Box plots
+- Automatic data analysis and visualization selection
+- Interactive Plotly charts
+- Responsive layout with grid/vertical options
+- Light/dark theme support
+- Multiple chart types supported (line, bar, scatter, pie, histogram, box)
 
 ## Installation
 
-1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/ai-dashboard-generator.git
-cd ai-dashboard-generator
-```
+# Clone the repository
+git clone https://github.com/Guy-Maoz/insights-deck-ai.git
+cd insights-deck-ai
 
-2. Create a virtual environment and activate it:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-3. Install dependencies:
-```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env and add your OpenAI API key
 ```
 
-4. Set up your OpenAI API key:
-```bash
-export OPENAI_API_KEY="your-api-key-here"
-```
+## Environment Variables
+
+Copy `.env.example` to `.env` and set the following variables:
+
+- `OPENAI_API_KEY`: Your OpenAI API key (get it from https://platform.openai.com/api-keys)
 
 ## Usage
-
-### Basic Usage
 
 ```python
 import asyncio
 from pathlib import Path
+import pandas as pd
 from dashboard_agent import create_dashboard
 
+# Example with a CSV file
 async def main():
-    # Create a dashboard from a CSV file
+    # From CSV file
     dashboard_path = await create_dashboard(
         dataset=Path("your_data.csv"),
-        instructions="""
-        Create a dashboard showing:
-        1. A line chart of daily trends
-        2. A histogram of values
-        3. A scatter plot comparing two metrics
-        Use a dark theme and grid layout
-        """,
+        instructions="Create a dashboard showing sales trends over time and top products",
+        output_dir=Path("output")
+    )
+    print(f"Dashboard created at: {dashboard_path}")
+
+    # Or with a pandas DataFrame
+    df = pd.DataFrame({
+        "date": pd.date_range("2023-01-01", periods=100),
+        "sales": np.random.randn(100).cumsum()
+    })
+    
+    dashboard_path = await create_dashboard(
+        dataset=df,
+        instructions="Create a line chart showing sales trends with a 7-day moving average",
         output_dir=Path("output")
     )
     print(f"Dashboard created at: {dashboard_path}")
@@ -69,45 +70,26 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Sample Data Generation
+## Supported Chart Types
 
-The repository includes a sample data generator for testing:
-
-```python
-python sample_data.py
-```
-
-This will create sample e-commerce data files that you can use to test the dashboard generator.
-
-### Running the Example
-
-```python
-python run_dashboard.py
-```
-
-This will create two sample dashboards:
-1. E-commerce daily metrics dashboard
-2. Product category performance dashboard
+- Line charts
+- Bar charts
+- Scatter plots
+- Pie charts
+- Histograms
+- Box plots
 
 ## Configuration
 
-The dashboard generator supports various configuration options:
+The dashboard layout and theme can be customized through the natural language instructions. For example:
 
-- **Layout**: Grid or vertical layout
-- **Theme**: Light or dark theme
-- **Chart Types**: Multiple chart types with customizable parameters
-- **Output Directory**: Configurable output location for generated dashboards
+- "Create a dark theme dashboard with a grid layout..."
+- "Generate a vertical dashboard with light theme..."
 
-## Contributing
+## Output
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+The agent generates a standalone HTML file containing the dashboard, which can be opened in any modern web browser. The dashboard is responsive and includes interactive features like zooming and hovering.
 
-## License
+## Security Note
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Built with [Plotly](https://plotly.com/python/)
-- Powered by [OpenAI GPT](https://openai.com/gpt-4)
-- Uses [Pydantic](https://pydantic.dev/) for data validation 
+Never commit your `.env` file to version control. The `.gitignore` file is configured to exclude it. 

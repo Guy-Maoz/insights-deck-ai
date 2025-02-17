@@ -6,6 +6,15 @@ import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 import json
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Validate required environment variables
+if not os.getenv("OPENAI_API_KEY"):
+    raise ValueError("OPENAI_API_KEY environment variable is not set. Please check your .env file.")
 
 class Dataset(BaseModel):
     data: pd.DataFrame
