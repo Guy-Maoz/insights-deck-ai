@@ -53,36 +53,44 @@ async def interactive_session():
     print(session.get_data_summary())
     
     print("\nYou can now interact with the dashboard generator. Here are some example commands:")
-    print("1. 'show columns' - Display available data columns")
-    print("2. 'create dashboard [your instructions]' - Generate a new dashboard")
-    print("3. 'help' - Show this help message")
-    print("4. 'exit' - End the session")
+    print("1. show columns - Display available data columns")
+    print("2. create dashboard [your instructions] - Generate a new dashboard")
+    print("3. help - Show this help message")
+    print("4. exit - End the session")
     
     while True:
         try:
-            user_input = input("\nWhat would you like to do? ").strip().lower()
+            # Get input and clean it
+            user_input = input("\nWhat would you like to do? ").strip()
+            # Remove any quotes and convert to lowercase for command matching
+            cleaned_input = user_input.replace("'", "").replace('"', "").lower().strip()
             
-            if user_input == 'exit':
+            if cleaned_input in ['exit', '4', 'quit']:
                 print("Ending session...")
                 break
             
-            elif user_input == 'help':
+            elif cleaned_input in ['help', '3', '?']:
                 print("\nAvailable commands:")
-                print("1. 'show columns' - Display available data columns")
-                print("2. 'create dashboard [your instructions]' - Generate a new dashboard")
-                print("3. 'help' - Show this help message")
-                print("4. 'exit' - End the session")
+                print("1. show columns - Display available data columns")
+                print("2. create dashboard [your instructions] - Generate a new dashboard")
+                print("3. help - Show this help message")
+                print("4. exit - End the session")
             
-            elif user_input == 'show columns':
+            elif cleaned_input in ['show columns', '1', 'columns']:
                 print("\nAvailable columns:")
                 for col in session.columns:
                     print(f"- {col}")
             
-            elif user_input.startswith('create dashboard'):
-                instructions = user_input[len('create dashboard'):].strip()
+            elif cleaned_input.startswith('create dashboard') or cleaned_input.startswith('2 '):
+                # Extract instructions, handling both "create dashboard" and "2" prefix
+                instructions = (user_input[len('create dashboard'):] if cleaned_input.startswith('create dashboard') 
+                              else user_input[2:]).strip()
+                
                 if not instructions:
                     print("Please provide instructions for the dashboard.")
                     print("Example: create dashboard Show me a bar chart of top 10 categories by Revenue")
+                    print("   - or -")
+                    print("2 Show me a bar chart of top 10 categories by Revenue")
                     continue
                 
                 print("\nGenerating dashboard...")
@@ -90,7 +98,7 @@ async def interactive_session():
                 print(result)
             
             else:
-                print("\nUnrecognized command. Type 'help' for available commands.")
+                print("\nUnrecognized command. Type 'help' or '3' for available commands.")
         
         except KeyboardInterrupt:
             print("\nEnding session...")
