@@ -3,6 +3,7 @@ import asyncio
 from competitive_analysis_agent import CompetitiveAnalysis
 from pathlib import Path
 import os
+from difflib import get_close_matches
 
 # Configure Streamlit page
 st.set_page_config(
@@ -21,6 +22,26 @@ if 'analyzer' not in st.session_state:
     st.session_state.analyzer = None
 if 'current_dashboard' not in st.session_state:
     st.session_state.current_dashboard = None
+if 'brand_validation' not in st.session_state:
+    st.session_state.brand_validation = None
+if 'pending_analysis' not in st.session_state:
+    st.session_state.pending_analysis = None
+
+def validate_brand(brand: str, available_brands: list) -> tuple[bool, list]:
+    """Validate and find close matches for a brand name."""
+    # First try exact match (case insensitive)
+    exact_matches = [b for b in available_brands if b.lower() == brand.lower()]
+    if exact_matches:
+        return True, exact_matches[0]
+    
+    # If no exact match, try to find close matches
+    close_matches = get_close_matches(brand.upper(), [b.upper() for b in available_brands], n=3, cutoff=0.6)
+    if close_matches:
+        # Get the original case for the matches
+        original_case_matches = [b for b in available_brands if b.upper() in close_matches]
+        return False, original_case_matches
+    
+    return False, []
 
 # Custom CSS for the split screen layout
 st.markdown("""
@@ -79,6 +100,35 @@ with chat_col:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
+        
+        # Handle brand validation if needed
+        if st.session_state.brand_validation:
+            with st.chat_message("assistant"):
+                st.markdown("Did you mean one of these brands?")
+                cols = st.columns(len(st.session_state.brand_validation))
+                for idx, brand in enumerate(st.session_state.brand_validation, 1):
+                    if cols[idx-1].button(f"{idx}. {brand}", key=f"brand_{idx}"):
+                        selected_brand = brand
+                        st.session_state.brand_validation = None
+                        
+                        # Process the pending analysis with the selected brand
+                        if st.session_state.pending_analysis:
+                            analysis_type, competitors = st.session_state.pending_analysis
+                            if analysis_type == "brand":
+                                result = asyncio.run(st.session_state.analyzer.generate_competitive_dashboard(brand=selected_brand))
+                            else:  # competitive
+                                result = asyncio.run(st.session_state.analyzer.generate_competitive_dashboard(
+                                    brand=selected_brand,
+                                    competitors=competitors
+                                ))
+                            st.session_state.current_dashboard = result
+                            st.session_state.pending_analysis = None
+                            st.rerun()
+                
+                if st.button("Use original input"):
+                    st.session_state.brand_validation = None
+                    st.session_state.pending_analysis = None
+                    st.rerun()
     
     # Chat input
     if prompt := st.chat_input("What would you like to analyze?"):
@@ -102,14 +152,24 @@ with chat_col:
                 if not brand:
                     st.markdown("Please specify a brand name.")
                 else:
-                    status_msg = st.empty()
-                    status_msg.write(f"Generating brand analysis for {brand}...")
-                    try:
-                        result = asyncio.run(st.session_state.analyzer.generate_competitive_dashboard(brand=brand))
-                        st.session_state.current_dashboard = result
-                        status_msg.write("Dashboard generated successfully!")
-                    except Exception as e:
-                        status_msg.error(f"Error generating dashboard: {str(e)}")
+                    # Validate brand name
+                    is_exact, matches = validate_brand(brand, st.session_state.analyzer.available_brands)
+                    if is_exact:
+                        status_msg = st.empty()
+                        status_msg.write(f"Generating brand analysis for {matches}...")
+                        try:
+                            result = asyncio.run(st.session_state.analyzer.generate_competitive_dashboard(brand=matches))
+                            st.session_state.current_dashboard = result
+                            status_msg.write("Dashboard generated successfully!")
+                        except Exception as e:
+                            status_msg.error(f"Error generating dashboard: {str(e)}")
+                    elif matches:
+                        st.session_state.brand_validation = matches
+                        st.session_state.pending_analysis = ("brand", None)
+                        st.rerun()
+                    else:
+                        st.error(f"Brand '{brand}' not found. Available brands:")
+                        st.json(sorted(st.session_state.analyzer.available_brands))
             
             elif "competitive analysis" in prompt.lower():
                 parts = prompt.split("competitive analysis")[-1].strip().split("vs")
@@ -118,17 +178,46 @@ with chat_col:
                 else:
                     brand = parts[0].strip()
                     competitors = [comp.strip() for comp in parts[1].split(",")]
-                    status_msg = st.empty()
-                    status_msg.write(f"Generating competitive analysis for {brand} vs {', '.join(competitors)}...")
-                    try:
-                        result = asyncio.run(st.session_state.analyzer.generate_competitive_dashboard(
-                            brand=brand,
-                            competitors=competitors
-                        ))
-                        st.session_state.current_dashboard = result
-                        status_msg.write("Dashboard generated successfully!")
-                    except Exception as e:
-                        status_msg.error(f"Error generating dashboard: {str(e)}")
+                    
+                    # Validate main brand first
+                    is_exact, matches = validate_brand(brand, st.session_state.analyzer.available_brands)
+                    if is_exact:
+                        # Validate competitors
+                        valid_competitors = []
+                        invalid_competitors = []
+                        for comp in competitors:
+                            is_comp_exact, comp_matches = validate_brand(comp, st.session_state.analyzer.available_brands)
+                            if is_comp_exact:
+                                valid_competitors.append(comp_matches)
+                            elif comp_matches:
+                                st.session_state.brand_validation = comp_matches
+                                st.session_state.pending_analysis = ("competitive", valid_competitors)
+                                st.rerun()
+                            else:
+                                invalid_competitors.append(comp)
+                        
+                        if invalid_competitors:
+                            st.error(f"Some competitors not found: {', '.join(invalid_competitors)}")
+                            st.json(sorted(st.session_state.analyzer.available_brands))
+                        else:
+                            status_msg = st.empty()
+                            status_msg.write(f"Generating competitive analysis for {matches} vs {', '.join(valid_competitors)}...")
+                            try:
+                                result = asyncio.run(st.session_state.analyzer.generate_competitive_dashboard(
+                                    brand=matches,
+                                    competitors=valid_competitors
+                                ))
+                                st.session_state.current_dashboard = result
+                                status_msg.write("Dashboard generated successfully!")
+                            except Exception as e:
+                                status_msg.error(f"Error generating dashboard: {str(e)}")
+                    elif matches:
+                        st.session_state.brand_validation = matches
+                        st.session_state.pending_analysis = ("competitive", competitors)
+                        st.rerun()
+                    else:
+                        st.error(f"Brand '{brand}' not found. Available brands:")
+                        st.json(sorted(st.session_state.analyzer.available_brands))
             
             else:
                 st.markdown("""I can help you with:
@@ -138,10 +227,11 @@ with chat_col:
                 """)
             
             # Add assistant response to chat history
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": "Dashboard generated successfully!" if st.session_state.current_dashboard else "How can I help you?"
-            })
+            if not st.session_state.brand_validation:
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": "Dashboard generated successfully!" if st.session_state.current_dashboard else "How can I help you?"
+                })
 
 # Dashboard display (right side)
 with dashboard_col:
