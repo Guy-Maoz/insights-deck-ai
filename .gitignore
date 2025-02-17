@@ -38,3 +38,10 @@ dashboards/
 # Environment variables
 .env
 .env.local 
+
+# macOS
+.DS_Store
+
+# Data files
+*.xlsx
+*.xls 
